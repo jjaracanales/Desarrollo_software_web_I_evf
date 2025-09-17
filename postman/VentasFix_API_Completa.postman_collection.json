@@ -1,0 +1,679 @@
+{
+  "info": {
+    "_postman_id": "1e2b5d9a-6f0a-4d89-b6f1-ventasfix-complete-api",
+    "name": "VentasFix API Completa (Users, Products, Clients)",
+    "description": "API completa para VentasFix con todas las operaciones CRUD para Usuarios, Productos y Clientes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000" },
+    { "key": "email", "value": "admin@ventasfix.cl" },
+    { "key": "password", "value": "password" },
+    { "key": "token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "clientId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (Sanctum Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Content-Type is JSON', function () { pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'); });",
+                  "  pm.test('Has token string', function () { pm.expect(json).to.have.property('token').that.is.a('string').and.is.not.empty; });",
+                  "  pm.collectionVariables.set('token', json.token);",
+                  "  console.log('Token saved: ' + json.token);",
+                  "} else {",
+                  "  pm.test('Expected JSON but got HTML - check URL and server', function () { pm.expect.fail('Response is not JSON. Check if server is running on ' + pm.variables.get('baseUrl')); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1. Usuarios (Users)",
+      "item": [
+        {
+          "name": "1.1. Listar todos los usuarios",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Responds in < 1500ms', function () { pm.expect(pm.response.responseTime).to.be.below(1500); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Has data array (paginated)', function () { pm.expect(json).to.have.property('data').that.is.an('array'); });",
+                  "  pm.test('Has pagination meta', function () { pm.expect(json).to.have.property('meta'); });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.2. Obtener usuario por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Si no hay userId, usa 1 (admin)",
+                  "if (!pm.collectionVariables.get('userId')) {",
+                  "  pm.collectionVariables.set('userId', '1');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('User has required fields', function () { ",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json).to.have.property('nombre');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.3. Agregar nuevo usuario",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generate unique email",
+                  "const ts = Date.now();",
+                  "pm.variables.set('uniqueEmail', `test${ts}@ventasfix.cl`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('User created with ID', function () { pm.expect(json).to.have.property('id'); });",
+                  "  pm.collectionVariables.set('userId', json.id);",
+                  "  console.log('Created user ID: ' + json.id);",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rut\": \"12.345.678-9\",\n  \"nombre\": \"Juan\",\n  \"apellido\": \"Pérez\",\n  \"email\": \"{{uniqueEmail}}\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "1.4. Actualizar usuario por ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Juan Carlos\",\n  \"apellido\": \"Pérez López\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Fields updated', function () { ",
+                  "    pm.expect(json.nombre).to.equal('Juan Carlos');",
+                  "    pm.expect(json.apellido).to.equal('Pérez López');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "1.5. Eliminar usuario por ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{userId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 204', function () { pm.expect([200, 204]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Productos (Products)",
+      "item": [
+        {
+          "name": "2.1. Listar todos los productos",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Responds in < 1500ms', function () { pm.expect(pm.response.responseTime).to.be.below(1500); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Has data array (paginated)', function () { pm.expect(json).to.have.property('data').that.is.an('array'); });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.2. Obtener producto por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{productId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Si no hay productId, usa 1",
+                  "if (!pm.collectionVariables.get('productId')) {",
+                  "  pm.collectionVariables.set('productId', '1');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Product has required fields', function () { ",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('sku');",
+                  "    pm.expect(json).to.have.property('nombre');",
+                  "    pm.expect(json).to.have.property('precio_neto');",
+                  "    pm.expect(json).to.have.property('precio_venta');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.3. Agregar nuevo producto",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generate unique SKU",
+                  "const ts = Date.now();",
+                  "pm.variables.set('sku', `SKU-${ts}`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Product has id and sku', function () { pm.expect(json).to.have.property('id'); pm.expect(json).to.have.property('sku'); });",
+                  "  pm.test('IVA calculated (precio_venta)', function () { ",
+                  "    const expectedVenta = Math.round(19990 * 1.19 * 100) / 100;",
+                  "    pm.expect(parseFloat(json.precio_venta)).to.be.closeTo(expectedVenta, 0.01);",
+                  "  });",
+                  "  pm.collectionVariables.set('productId', json.id);",
+                  "  console.log('Created product ID: ' + json.id);",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sku\": \"{{sku}}\",\n  \"nombre\": \"Teclado Mecánico\",\n  \"descripcion_corta\": \"Teclado gaming mecánico\",\n  \"descripcion_larga\": \"Teclado mecánico para gaming con switches Cherry MX Red\",\n  \"imagen_url\": \"https://picsum.photos/300/200\",\n  \"precio_neto\": 19990,\n  \"stock_actual\": 15,\n  \"stock_minimo\": 3,\n  \"stock_bajo\": 5,\n  \"stock_alto\": 50\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products"]
+            }
+          }
+        },
+        {
+          "name": "2.4. Actualizar producto por ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Teclado Gamer Pro\",\n  \"stock_actual\": 20,\n  \"precio_neto\": 25990\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{productId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Fields updated', function () { ",
+                  "    pm.expect(json.nombre).to.equal('Teclado Gamer Pro');",
+                  "    pm.expect(json.stock_actual).to.equal(20);",
+                  "  });",
+                  "  pm.test('IVA recalculated', function () { ",
+                  "    const expectedVenta = Math.round(25990 * 1.19 * 100) / 100;",
+                  "    pm.expect(parseFloat(json.precio_venta)).to.be.closeTo(expectedVenta, 0.01);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2.5. Eliminar producto por ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/products/{{productId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "products", "{{productId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 204', function () { pm.expect([200, 204]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Clientes (Clients)",
+      "item": [
+        {
+          "name": "3.1. Listar todos los clientes",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Responds in < 1500ms', function () { pm.expect(pm.response.responseTime).to.be.below(1500); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Has data array (paginated)', function () { pm.expect(json).to.have.property('data').that.is.an('array'); });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.2. Obtener cliente por ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "{{clientId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Si no hay clientId, usa 1",
+                  "if (!pm.collectionVariables.get('clientId')) {",
+                  "  pm.collectionVariables.set('clientId', '1');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Client has required fields', function () { ",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('rut_empresa');",
+                  "    pm.expect(json).to.have.property('razon_social');",
+                  "    pm.expect(json).to.have.property('rubro');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.3. Agregar nuevo cliente",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Generate unique RUT",
+                  "const ts = Date.now().toString().slice(-8);",
+                  "pm.variables.set('uniqueRut', `${ts.slice(0,2)}.${ts.slice(2,5)}.${ts.slice(5,8)}-9`);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 201', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Client created with ID', function () { pm.expect(json).to.have.property('id'); });",
+                  "  pm.collectionVariables.set('clientId', json.id);",
+                  "  console.log('Created client ID: ' + json.id);",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rut_empresa\": \"{{uniqueRut}}\",\n  \"rubro\": \"Tecnología\",\n  \"razon_social\": \"Innovaciones Tech SpA\",\n  \"telefono\": \"+56 9 8888 9999\",\n  \"direccion\": \"Av. Las Condes 1234, Las Condes\",\n  \"contacto_nombre\": \"Ana García\",\n  \"contacto_email\": \"ana.garcia@innovacionestech.cl\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients"]
+            }
+          }
+        },
+        {
+          "name": "3.4. Actualizar cliente por ID",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"razon_social\": \"Innovaciones Tech Premium SpA\",\n  \"telefono\": \"+56 9 7777 8888\",\n  \"contacto_nombre\": \"Ana María García\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "{{clientId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "",
+                  "if (pm.response.headers.get('Content-Type')?.includes('application/json')) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Fields updated', function () { ",
+                  "    pm.expect(json.razon_social).to.equal('Innovaciones Tech Premium SpA');",
+                  "    pm.expect(json.telefono).to.equal('+56 9 7777 8888');",
+                  "    pm.expect(json.contacto_nombre).to.equal('Ana María García');",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Expected JSON response', function () { pm.expect.fail('Response is not JSON'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3.5. Eliminar cliente por ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "clients", "{{clientId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 or 204', function () { pm.expect([200, 204]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
